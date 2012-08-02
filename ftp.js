@@ -34,7 +34,9 @@ module.exports = function setup(fsOptions) {
         rmdir: rmdir,
         rename: rename,
         copy: copy,
-        symlink: symlink
+        symlink: symlink,
+        spawn: spawn,
+        connect: connect
     };
 
     function readfile(path, options, callback) {
@@ -243,5 +245,17 @@ module.exports = function setup(fsOptions) {
 
     function symlink(path, options, callback) {
         callback(new Error("symlink: Not Implemented"));
+    }
+
+    function spawn(executablePath, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot spawn.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
+    function connect(port, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot connect.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
     }
 };
