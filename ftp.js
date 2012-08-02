@@ -1,6 +1,7 @@
 var getMime = require('simple-mime')("application/octet-stream");
 var FTP = require("jsftp");
 var Crypto = require("crypto");
+var Stream = require('stream').Stream;
 
 function once(fn) {
     var done = false;
@@ -27,14 +28,13 @@ module.exports = function setup(fsOptions) {
         readfile: readfile,
         mkfile: mkfile,
         rmfile: rmfile,
-        //readdir: readdir,
+        readdir: readdir,
         stat: stat,
         mkdir: mkdir,
         rmdir: rmdir,
         rename: rename,
         copy: copy,
-        symlink: symlink,
-        //resetCache: resetCache
+        symlink: symlink
     };
 
     function readfile(path, options, callback) {
@@ -57,12 +57,71 @@ module.exports = function setup(fsOptions) {
                 return callback(null, meta);
             }
 
-            ftpClient.getSocket(path, function(err, socket) {
+            ftpClient.getGetSocket(path, function(err, readable) {
                 if (err) return callback(err);
 
-                meta.stream = socket;
+                if (readable.resume)
+                    readable.resume();
+
+                meta.stream = readable;
                 callback(null, meta);
             });
+        });
+    }
+
+    function readdir(path, options, callback) {
+        callback = once(callback);
+
+        ftpClient.ls(path, function(err, list) {
+            if (err)
+                callback(err);
+
+            var meta = {};
+            if (options.head)
+                callback(null, meta);
+
+            var stream = new Stream();
+            stream.readable = true;
+            var paused;
+            stream.pause = function () {
+                if (paused === true) return;
+                paused = true;
+            };
+
+            stream.resume = function () {
+                if (paused === false) return;
+                paused = false;
+                getNext();
+            };
+
+            meta.stream = stream;
+            callback(null, meta);
+
+            var index = 0;
+            stream.resume();
+            function getNext() {
+                if (index === list.length)
+                    return done();
+
+                var file = list[index++];
+                var entry = {
+                    name: file.name,
+                    path: path,
+                    href: "#",
+                    mime: getMime(path),
+                    size: parseInt(file.size, 10),
+                    etag: calcEtag(path + file.size)
+                };
+
+                stream.emit("data", entry);
+
+                if (!paused) {
+                    getNext();
+                }
+            }
+            function done() {
+                stream.emit("end");
+            }
         });
     }
 
@@ -88,13 +147,15 @@ module.exports = function setup(fsOptions) {
                 callback(err);
         }
 
-        //this pipes readable with pasv socket
+        // Retrieve FTP passive connection socket, after `getPutSocket`
         ftpClient.getPutSocket(path, readable, function(err, socket) {
             if (err) return error(err);
 
             if (socket && socket.writable) {
-                readable.on("end", callback);
+                socket.on("close", callback);
                 readable.on("error", error);
+                socket.on("error", error);
+
                 readable.pipe(socket);
 
                 if (readable.resume)
