@@ -15,8 +15,8 @@ function once(fn) {
     };
 }
 
-function calcEtag(path, size) {
-    return Crypto.createHash('md5').update("" + path + size).digest("hex");
+function calcEtag(name, time, size) {
+    return Crypto.createHash('md5').update("" + name + time + size).digest("hex");
 }
 
 // fsOptions.credentials - object containing port, host, user and password. All
@@ -62,7 +62,7 @@ module.exports = function setup(fsOptions) {
             ftpClient.getGetSocket(path, function(err, readable) {
                 if (err) return callback(err);
 
-                if (readable.resume)
+                if (readable.resume && !readable._connecting)
                     readable.resume();
 
                 meta.stream = readable;
@@ -76,11 +76,11 @@ module.exports = function setup(fsOptions) {
 
         ftpClient.ls(path, function(err, list) {
             if (err)
-                callback(err);
+                return callback(err);
 
             var meta = {};
             if (options.head)
-                callback(null, meta);
+                return callback(null, meta);
 
             var stream = new Stream();
             stream.readable = true;
@@ -110,9 +110,9 @@ module.exports = function setup(fsOptions) {
                     name: file.name,
                     path: path,
                     href: "#",
-                    mime: getMime(path),
+                    mime: getMime(file.name),
                     size: parseInt(file.size, 10),
-                    etag: calcEtag(path + file.size)
+                    etag: calcEtag(file.name, file.time, file.size)
                 };
 
                 stream.emit("data", entry);
@@ -176,7 +176,7 @@ module.exports = function setup(fsOptions) {
 
     function stat(path, options, callback) {
         ftpClient.ls(path, function(err, result) {
-            if (err || !result || result.length === 0)
+            if (err)
                 return callback(new Error("The file " + path + " could not be retrieved."));
 
             var stat = result[0]; // File information already parsed
