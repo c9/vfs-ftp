@@ -2,17 +2,20 @@
     "author": "Sergi Mansilla <sergi@c9.io>",
     "name": "vfs-ftp",
     "description": "FTP adapter for Virtual File System (VFS)",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs-ftp.git"
     },
     "main": "ftp.js",
     "dependencies": {
-        "jsftp": "0.3.7",
+        "jsftp": "0.4.7",
         "simple-mime": "0.0.5"
     },
-    "devDependencies": {},
+    "devDependencies": {
+        "stack": "0.1.0",
+        "vfs-http-adapter": "0.2.3"
+    },
     "optionalDependencies": {},
     "engines": {
         "node": ">=0.4"
