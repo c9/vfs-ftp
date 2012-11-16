@@ -6,10 +6,9 @@ var Stream = require('stream').Stream;
 function once(fn) {
     var done = false;
     return function () {
-        if (done) {
-            console.warn("Attempt to call callback more than once " + fn);
-            return;
-        }
+        if (done)
+            return console.warn("Attempt to call callback more than once " + fn);
+
         done = true;
         return fn.apply(this, arguments);
     };
@@ -25,18 +24,18 @@ module.exports = function setup(fsOptions) {
     var ftpClient = new FTP(fsOptions.credentials);
 
     return {
-        readfile: readfile,
-        mkfile: mkfile,
-        rmfile: rmfile,
-        readdir: readdir,
-        stat: stat,
-        mkdir: mkdir,
-        rmdir: rmdir,
-        rename: rename,
+        connect: connect,
         copy: copy,
-        symlink: symlink,
+        mkdir: mkdir,
+        mkfile: mkfile,
+        readdir: readdir,
+        rename: rename,
+        rmdir: rmdir,
+        rmfile: rmfile,
         spawn: spawn,
-        connect: connect
+        stat: stat,
+        symlink: symlink,
+        readfile: readfile
     };
 
     function readfile(path, options, callback) {
@@ -62,7 +61,7 @@ module.exports = function setup(fsOptions) {
             ftpClient.getGetSocket(path, function(err, readable) {
                 if (err) return callback(err);
 
-                if (readable.resume && !readable._connecting)
+                if (readable.resume)// && !readable._connecting)
                     readable.resume();
 
                 meta.stream = readable;
@@ -75,16 +74,16 @@ module.exports = function setup(fsOptions) {
         callback = once(callback);
 
         ftpClient.ls(path, function(err, list) {
-            if (err)
-                return callback(err);
+            if (err) return callback(err);
 
             var meta = {};
             if (options.head)
                 return callback(null, meta);
 
             var stream = new Stream();
-            stream.readable = true;
             var paused;
+
+            stream.readable = true;
             stream.pause = function () {
                 if (paused === true) return;
                 paused = true;
@@ -127,26 +126,55 @@ module.exports = function setup(fsOptions) {
         });
     }
 
-    function mkfile(path, options, callback) {
-        callback = once(callback);
+    function mkfile(path, options, realCallback) {
+        var meta = {};
+        var called;
+        var callback = function (err, meta) {
+            if (called) {
+                if (err) {
+                    if (meta.stream)
+                        meta.stream.emit("error", err);
+                    else
+                        console.error(err.stack);
+                }
+                else if (meta.stream) {
+                    meta.stream.emit("saved");
+                }
+                return;
+            }
+            called = true;
+            return realCallback.apply(this, arguments);
+        };
 
-        if (!options.stream) {
-            return callback(new Error("stream is an required option"));
+        if (options.stream && !options.stream.readable) {
+            return callback(new TypeError("options.stream must be readable."));
         }
 
         // Pause the input for now since we're not ready to write quite yet
         var readable = options.stream;
-        if (readable.pause)
-            readable.pause();
+        if (readable) {
+            if (readable.pause)
+                readable.pause();
 
+            var buffer = [];
+            readable.on("data", onData);
+            readable.on("end", onEnd);
+        }
+
+        function onData(chunk) {
+            buffer.push(["data", chunk]);
+        }
+        function onEnd() {
+            buffer.push(["end"]);
+        }
         function error(err) {
-            readable.removeListener("end", callback);
-
-            if (readable.destroy)
-                readable.destroy();
-
-            if (err)
-                callback(err);
+            if (readable) {
+                readable.removeListener("data", onData);
+                readable.removeListener("end", onEnd);
+                if (readable.destroy)
+                    readable.destroy();
+            }
+            if (err) return callback(err);
         }
 
         // Retrieve FTP passive connection socket, after `getPutSocket`
@@ -158,10 +186,34 @@ module.exports = function setup(fsOptions) {
                 readable.on("error", error);
                 socket.on("error", error);
 
-                readable.pipe(socket);
+                if (readable)
+                    readable.pipe(socket);
+                else
+                    meta.stream = socket;
 
-                if (readable.resume)
-                    readable.resume();
+                var hadError;
+                socket.on("error", function (err) {
+                    hadError = true;
+                    error(err);
+                });
+
+                socket.on("close", function () {
+                    if (hadError) return;
+                    callback(null, meta);
+                });
+
+                if (readable) {
+                    // Stop buffering events and playback anything that happened.
+                    readable.removeListener("data", onData);
+                    readable.removeListener("end", onEnd);
+                    buffer.forEach(function (event) {
+                        readable.emit.apply(readable, event);
+                    });
+
+                    // Resume the input stream if possible
+                    if (readable.resume)
+                        readable.resume();
+                }
             }
             else {
                 callback(new Error("Could not retrieve a passive connection for " +
@@ -212,12 +264,23 @@ module.exports = function setup(fsOptions) {
     }
 
     function copy(path, options, callback) {
+        // We don't want to calll the callback twice in any situation
         callback = once(callback);
-        if (!options || !options.from)
-            callback(new Error("copy: No 'from' field in options."));
 
-        ftpClient.getGetSocket(options.from, function(err, readable) {
-            if (err) callback(err);
+        var from, to;
+        if (options.from) {
+            from = options.from; to = path;
+        }
+        else if (options.to) {
+            from = path; to = options.to;
+        }
+        else {
+            return callback(new Error("Must specify either options.from or options.to"));
+        }
+
+        ftpClient.getGetSocket(from, function(err, readable) {
+            if (err) return callback(err);
+
             if (readable.pause)
                 readable.pause();
 
@@ -225,20 +288,26 @@ module.exports = function setup(fsOptions) {
 
             function error(err) {
                 readable.removeListener("error", callback);
+                readable.removeListener("close", callback);
 
                 if (readable.destroy)
                     readable.destroy();
 
                 if (err)
-                    callback(err);
+                    return callback(err);
             }
 
-            ftpClient.getPutSocket(path, function(err, writer) {
-                if (err) callback(err);
-
+            ftpClient.getPutSocket(to, function(err, writer) {
+                if (err) return callback(err);
                 readable.pipe(writer);
-                writer.on("close", function() { callback(null, {}); });
-                writer.on("error", error);
+                if (readable.resume)
+                    readable.resume();
+
+                readable.on("close", function(hadError) {
+                    if (!hadError) // `error` function should take care of it.
+                        callback(null, {});
+                });
+                readable.on("error", error);
             });
         });
     }
