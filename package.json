@@ -14,6 +14,7 @@
     },
     "devDependencies": {
         "stack": "0.1.0",
+        "vfs-lint": "~0.0.0",
         "vfs-http-adapter": "0.2.3"
     },
     "scripts": {

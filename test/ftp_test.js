@@ -26,9 +26,9 @@ describe("jsftp test suite", function() {
         }
 
         setTimeout(function() {
-            vfs = require('../ftp')({
+            vfs = require('vfs-lint')(require('../ftp')({
                 credentials: FTPCredentials
-            });
+            }));
             next();
         }, 200);
     });
@@ -43,8 +43,8 @@ describe("jsftp test suite", function() {
     });
 
     it("vfs.stat should return a valid 'stat' object", function(next) {
-        vfs.stat("package.json", null, function(err, meta) {
-            assert.ok(!err);
+        vfs.stat("package.json", {}, function(err, meta) {
+            assert.ok(!err, err);
             assert.equal(meta.mime, "application/json");
             assert.equal(meta.size, fs.statSync("package.json").size);
             assert.equal(meta.name, "package.json");
@@ -143,23 +143,11 @@ describe("jsftp test suite", function() {
         });
     });
 
-    it.only("vfs.copy should copy preserving the file integrity: to", function(next) {
+    it("vfs.copy should fail copying a non-existing file", function(next) {
         vfs.copy("fake_file", { to: "package.json.bak" }, function(err, meta) {
-            assert.ok(!err, err);
-            vfs.readfile("package.json.bak", {}, function(err, meta) {
-                assert.ok(!err);
-                assert.equal(meta.size, fs.statSync("package.json").size);
-
-                concatStream(null, meta.stream, function(err, data) {
-                    assert(!err);
-                    var realContents = fs.readFileSync("package.json");
-                    assert.equal(realContents, data.toString());
-                    vfs.rmfile("package.json.bak", {}, function(err, meta) {
-                        assert(!err);
-                        next();
-                    });
-                });
-            });
+            assert.ok(err);
+            // assert.equal(err.code, "ENOENT");
+            next();
         });
     });
 });

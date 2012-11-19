@@ -22,6 +22,7 @@ function calcEtag(name, time, size) {
 // the properties are strings except for port, which is a number.
 module.exports = function setup(fsOptions) {
     var ftpClient = new FTP(fsOptions.credentials);
+    var handlers = {};
 
     return {
         connect: connect,
@@ -30,12 +31,25 @@ module.exports = function setup(fsOptions) {
         mkfile: mkfile,
         readdir: readdir,
         rename: rename,
+        resolve: resolve,
         rmdir: rmdir,
         rmfile: rmfile,
         spawn: spawn,
         stat: stat,
         symlink: symlink,
-        readfile: readfile
+        readfile: readfile,
+        watch: watch,
+        execFile: execFile,
+
+        // Basic async event emitter style API
+        on: on,
+        off: off,
+        emit: emit,
+
+        // Extending the API
+        extend: extend,
+        unextend: unextend,
+        use: use
     };
 
     function readfile(path, options, callback) {
@@ -312,6 +326,39 @@ module.exports = function setup(fsOptions) {
         });
     }
 
+    function on(name, handler, callback) {
+        if (!handlers[name]) handlers[name] = [];
+        handlers[name].push(handler);
+        callback && callback();
+    }
+
+    function off(name, handler, callback) {
+        var list = handlers[name];
+        if (list) {
+            var index = list.indexOf(handler);
+            if (index >= 0) {
+                list.splice(index, 1);
+            }
+        }
+        callback && callback();
+    }
+
+    function emit(name, value, callback) {
+        var list = handlers[name];
+        if (list) {
+            for (var i = 0, l = list.length; i < l; i++) {
+                list[i](value);
+            }
+        }
+        callback && callback();
+    }
+
+    function resolve(path, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot resolve.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
     function symlink(path, options, callback) {
         callback(new Error("symlink: Not Implemented"));
     }
@@ -324,6 +371,36 @@ module.exports = function setup(fsOptions) {
 
     function connect(port, options, callback) {
         var err = new Error("ENOTSUPPORTED: FTP cannot connect.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
+    function watch(path, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot watch.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
+    function execFile(path, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot execFile.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
+    function extend(name, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot execFile.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
+    function unextend(name, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot execFile.");
+        err.code = "ENOTSUPPORTED";
+        callback(err);
+    }
+
+    function use(name, options, callback) {
+        var err = new Error("ENOTSUPPORTED: FTP cannot execFile.");
         err.code = "ENOTSUPPORTED";
         callback(err);
     }
