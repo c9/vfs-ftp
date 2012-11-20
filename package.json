@@ -15,7 +15,8 @@
     "devDependencies": {
         "stack": "0.1.0",
         "vfs-lint": "~0.0.0",
-        "vfs-http-adapter": "0.2.3"
+        "vfs-http-adapter": "0.2.3",
+        "mocha": "~1.5.0"
     },
     "scripts": {
         "test": "mocha -R spec -t 5000"
