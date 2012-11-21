@@ -10,6 +10,6 @@ most notable one is that it will be faster than using jsFTP (the underlying FTP 
 in the traditional way, since VFS-ftp is piping streams whenever possible, which
 makes for a faster upload/download times and a smaller memory footprint. In jsftp,
 the user can choose between both options, but the piping requires more boilerplate,
-whereas using buffers hrough the API is very straight-forward.
+whereas using buffers through the API is very straight-forward.
 
 This project is work in process.
