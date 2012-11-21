@@ -75,7 +75,7 @@ module.exports = function setup(fsOptions) {
             ftpClient.getGetSocket(path, function(err, readable) {
                 if (err) return callback(err);
 
-                if (readable.resume)// && !readable._connecting)
+                if (readable.resume)
                     readable.resume();
 
                 meta.stream = readable;
@@ -295,9 +295,6 @@ module.exports = function setup(fsOptions) {
         ftpClient.getGetSocket(from, function(err, readable) {
             if (err) return callback(err);
 
-            if (readable.pause)
-                readable.pause();
-
             readable.on("error", callback);
 
             function error(err) {
@@ -311,14 +308,13 @@ module.exports = function setup(fsOptions) {
                     return callback(err);
             }
 
-            ftpClient.getPutSocket(to, function(err, writer) {
+            ftpClient.getPutSocket(to, function(err, socket) {
                 if (err) return callback(err);
-                readable.pipe(writer);
-                if (readable.resume)
-                    readable.resume();
+                readable.pipe(socket);
+                readable.resume();
 
                 readable.on("close", function(hadError) {
-                    if (!hadError) // `error` function should take care of it.
+                    if (!hadError)
                         callback(null, {});
                 });
                 readable.on("error", error);
@@ -327,7 +323,9 @@ module.exports = function setup(fsOptions) {
     }
 
     function on(name, handler, callback) {
-        if (!handlers[name]) handlers[name] = [];
+        if (!handlers[name])
+            handlers[name] = [];
+
         handlers[name].push(handler);
         callback && callback();
     }

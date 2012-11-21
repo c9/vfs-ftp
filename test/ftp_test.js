@@ -1,3 +1,4 @@
+/*global describe it beforeEach afterEach */
 var exec = require("child_process").spawn;
 var assert = require("assert");
 var fs = require('fs');
