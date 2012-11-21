@@ -49,7 +49,9 @@ module.exports = function setup(fsOptions) {
         // Extending the API
         extend: extend,
         unextend: unextend,
-        use: use
+        use: use,
+
+        destroy: destroy
     };
 
     function readfile(path, options, callback) {
@@ -74,9 +76,6 @@ module.exports = function setup(fsOptions) {
 
             ftpClient.getGetSocket(path, function(err, readable) {
                 if (err) return callback(err);
-
-                if (readable.resume)
-                    readable.resume();
 
                 meta.stream = readable;
                 callback(null, meta);
@@ -166,72 +165,30 @@ module.exports = function setup(fsOptions) {
 
         // Pause the input for now since we're not ready to write quite yet
         var readable = options.stream;
-        if (readable) {
-            if (readable.pause)
-                readable.pause();
-
-            var buffer = [];
-            readable.on("data", onData);
-            readable.on("end", onEnd);
-        }
-
-        function onData(chunk) {
-            buffer.push(["data", chunk]);
-        }
-        function onEnd() {
-            buffer.push(["end"]);
-        }
         function error(err) {
-            if (readable) {
-                readable.removeListener("data", onData);
-                readable.removeListener("end", onEnd);
-                if (readable.destroy)
-                    readable.destroy();
+            if (readable && readable.destroy) {
+                readable.destroy();
             }
             if (err) return callback(err);
         }
 
-        // Retrieve FTP passive connection socket, after `getPutSocket`
-        ftpClient.getPutSocket(path, readable, function(err, socket) {
+        ftpClient.getPutSocket(path, function(err, socket) {
             if (err) return error(err);
 
-            if (socket && socket.writable) {
-                socket.on("close", callback);
-                readable.on("error", error);
-                socket.on("error", error);
-
-                if (readable)
-                    readable.pipe(socket);
-                else
-                    meta.stream = socket;
-
-                var hadError;
-                socket.on("error", function (err) {
-                    hadError = true;
-                    error(err);
-                });
-
-                socket.on("close", function () {
-                    if (hadError) return;
-                    callback(null, meta);
-                });
-
-                if (readable) {
-                    // Stop buffering events and playback anything that happened.
-                    readable.removeListener("data", onData);
-                    readable.removeListener("end", onEnd);
-                    buffer.forEach(function (event) {
-                        readable.emit.apply(readable, event);
-                    });
-
-                    // Resume the input stream if possible
-                    if (readable.resume)
-                        readable.resume();
-                }
+            if (!socket || !socket.writable) {
+                callback(new Error("Could not get socket for '" + path + "'."));
             }
-            else {
-                callback(new Error("Could not retrieve a passive connection for " +
-                                   "command 'stor'" + path + "'."));
+
+            meta.stream = socket;
+            socket.on("close", function () { callback(null, meta); });
+            socket.on("error", error);
+
+            if (readable) { // An input stream was provided
+                readable.on("error", error);
+                readable.pipe(socket);
+
+                if (readable.resume)
+                    readable.resume();
             }
         });
     }
@@ -292,33 +249,15 @@ module.exports = function setup(fsOptions) {
             return callback(new Error("Must specify either options.from or options.to"));
         }
 
+        var self = this;
         ftpClient.getGetSocket(from, function(err, readable) {
-            if (err) return callback(err);
+            if (err)
+                return callback(err);
 
-            readable.on("error", callback);
+            if (!readable)
+                return callback(new Error("Could not retrieve readable stream for " + from));
 
-            function error(err) {
-                readable.removeListener("error", callback);
-                readable.removeListener("close", callback);
-
-                if (readable.destroy)
-                    readable.destroy();
-
-                if (err)
-                    return callback(err);
-            }
-
-            ftpClient.getPutSocket(to, function(err, socket) {
-                if (err) return callback(err);
-                readable.pipe(socket);
-                readable.resume();
-
-                readable.on("close", function(hadError) {
-                    if (!hadError)
-                        callback(null, {});
-                });
-                readable.on("error", error);
-            });
+            self.mkfile(to, { stream: readable }, callback);
         });
     }
 
@@ -349,6 +288,13 @@ module.exports = function setup(fsOptions) {
             }
         }
         callback && callback();
+    }
+
+    function destroy() {
+        if (ftpClient) {
+            ftpClient.destroy();
+            ftpClient = null;
+        }
     }
 
     function resolve(path, options, callback) {

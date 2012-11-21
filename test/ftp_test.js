@@ -2,8 +2,8 @@
 var exec = require("child_process").spawn;
 var assert = require("assert");
 var fs = require('fs');
+var Ftp = require("jsftp");
 
-var daemon;
 var FTPCredentials = {
     host: "localhost",
     user: "user",
@@ -12,7 +12,8 @@ var FTPCredentials = {
 };
 
 describe("jsftp test suite", function() {
-    var vfs;
+    var vfs, daemon;
+
     beforeEach(function(next) {
         try {
             daemon = exec('python', ['node_modules/jsftp/test/basic_ftpd.py']);
@@ -36,11 +37,10 @@ describe("jsftp test suite", function() {
 
     afterEach(function(next) {
         if (daemon)
-            daemon.kill();
+            daemon.kill("SIGKILL");
 
-        setTimeout(function() {
-            next();
-        }, 200);
+        vfs.destroy();
+        setTimeout(function() { next(); }, 100);
     });
 
     it("vfs.stat should return a valid 'stat' object", function(next) {
@@ -56,7 +56,8 @@ describe("jsftp test suite", function() {
 
     it("vfs.readfile should return a valid 'stat' object with streaming file contents", function(next) {
         vfs.readfile("package.json", {}, function(err, meta) {
-            concatStream(null, meta.stream, function(err, data) {
+            assert(!err, err);
+            Ftp._concatStream(null, meta.stream, function(err, data) {
                 assert(!err);
                 var realContents = fs.readFileSync("package.json");
                 assert.equal(realContents, data.toString());
@@ -108,15 +109,15 @@ describe("jsftp test suite", function() {
     });
 
     it("vfs.copy should copy preserving the file integrity: from", function(next) {
+        var realContents = fs.readFileSync("package.json");
         vfs.copy("package.json.bak", { from: "package.json" }, function(err, meta) {
-            assert.ok(!err);
+            assert.ok(!err, err);
             vfs.readfile("package.json.bak", {}, function(err, meta) {
                 assert.ok(!err);
                 assert.equal(meta.size, fs.statSync("package.json").size);
 
-                concatStream(null, meta.stream, function(err, data) {
+                Ftp._concatStream(null, meta.stream, function(err, data) {
                     assert(!err);
-                    var realContents = fs.readFileSync("package.json");
                     assert.equal(realContents, data.toString());
                     next();
                 });
@@ -126,12 +127,12 @@ describe("jsftp test suite", function() {
 
     it("vfs.copy should copy preserving the file integrity: to", function(next) {
         vfs.copy("package.json", { to: "package.json.bak" }, function(err, meta) {
-            assert.ok(!err);
+            assert.ok(!err, err);
             vfs.readfile("package.json.bak", {}, function(err, meta) {
-                assert.ok(!err);
+                assert.ok(!err, err);
                 assert.equal(meta.size, fs.statSync("package.json").size);
 
-                concatStream(null, meta.stream, function(err, data) {
+                Ftp._concatStream(null, meta.stream, function(err, data) {
                     assert(!err);
                     var realContents = fs.readFileSync("package.json");
                     assert.equal(realContents, data.toString());
@@ -146,39 +147,9 @@ describe("jsftp test suite", function() {
 
     it("vfs.copy should fail copying a non-existing file", function(next) {
         vfs.copy("fake_file", { to: "package.json.bak" }, function(err, meta) {
-            assert.ok(err);
+            assert.ok(err, err);
             // assert.equal(err.code, "ENOENT");
             next();
         });
     });
 });
-
-function concat(bufs) {
-    var buffer, length = 0, index = 0;
-
-    if (!Array.isArray(bufs))
-        bufs = Array.prototype.slice.call(arguments);
-
-    for (var i=0, l=bufs.length; i<l; i++) {
-        buffer = bufs[i];
-        length += buffer.length;
-    }
-
-    buffer = new Buffer(length);
-
-    bufs.forEach(function(buf, i) {
-        buf.copy(buffer, index, 0, buf.length);
-        index += buf.length;
-    });
-
-    return buffer;
-}
-
-function concatStream(err, stream, callback) {
-    if (err) return callback(err);
-
-    var pieces = [];
-    stream.on("data", function(p) { pieces.push(p); });
-    stream.on("end", function() { callback(null, concat(pieces)); });
-    stream.on("error", function(e) { callback(e); });
-}

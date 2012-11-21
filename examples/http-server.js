@@ -34,4 +34,3 @@ if (!FTPCredentials.user || !FTPCredentials.pass) {
 else {
     startServer();
 }
-
