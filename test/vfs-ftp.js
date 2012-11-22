@@ -257,6 +257,59 @@ describe("jsftp test suite", function() {
         });
     });
 
+    describe('vfs.rename()', function() {
+        it("should rename a file using options.to", function(done) {
+            var before = "start.txt";
+            var after = "end.txt";
+            var text = "Move me please\n";
+
+            fs.writeFileSync(before, text);
+            expect(fs.existsSync(before)).ok;
+            expect(fs.existsSync(after)).not.ok;
+
+            vfs.rename(before, {
+                to: after
+            }, function(err, meta) {
+                if (err) throw err;
+                expect(fs.existsSync(before)).not.ok;
+                expect(fs.existsSync(after)).ok;
+                expect(fs.readFileSync(after, "utf8")).equal(text);
+                fs.unlinkSync(after);
+                done();
+            });
+        });
+
+        it("should rename a file using options.from", function(done) {
+            var before = "start.txt";
+            var after = "end.txt";
+            var text = "Move me please\n";
+
+            fs.writeFileSync(before, text);
+            expect(fs.existsSync(before)).ok;
+            expect(fs.existsSync(after)).not.ok;
+
+            vfs.rename(after, {
+                from: before
+            }, function(err, meta) {
+                if (err) throw err;
+                expect(fs.existsSync(before)).not.ok;
+                expect(fs.existsSync(after)).ok;
+                expect(fs.readFileSync(after, "utf8")).equal(text);
+                fs.unlinkSync(after);
+                done();
+            });
+        });
+
+        it("should error with ENOENT if the source doesn't exist", function(done) {
+            vfs.rename("notexist", {
+                to: "newname"
+            }, function(err, meta) {
+                expect(err).property("code").equal("ENOENT");
+                done();
+            });
+        });
+    });
+
     describe('rmfile()', function() {
         it("should delete a file", function(next) {
             var vpath = "deleteme.txt";
@@ -474,38 +527,116 @@ describe("jsftp test suite", function() {
         });
     });
 
+    describe('vfs.on(), vfs.off(), vfs.emit()', function() {
+        it("should register an event listener and catch an event", function(done) {
+            vfs.on("myevent", onEvent, function(err) {
+                if (err) throw err;
+                vfs.emit("myevent", 42, function(err) {
+                    if (err) throw err;
+                });
+            });
+
+            function onEvent(data) {
+                expect(data).equal(42);
+                vfs.off("myevent", onEvent, done);
+            }
+        });
+        it("should catch multiple events of the same type", function(done) {
+            var times = 0;
+            vfs.on("myevent", onEvent, function(err) {
+                if (err) throw err;
+                vfs.emit("myevent", 43, function(err) {
+                    if (err) throw err;
+                });
+                vfs.emit("myevent", 43, function(err) {
+                    if (err) throw err;
+                });
+            });
+
+            function onEvent(data) {
+                expect(data).equal(43);
+                if (++times === 2) {
+                    vfs.off("myevent", onEvent, done);
+                }
+            }
+        });
+        it("should call multiple listeners for a single event", function(done) {
+            var times = 0;
+            vfs.on("myevent", onEvent1, function(err) {
+                if (err) throw err;
+                vfs.on("myevent", onEvent2, function(err) {
+                    if (err) throw err;
+                    vfs.emit("myevent", 44, function(err) {
+                        if (err) throw err;
+                    });
+                });
+            });
+
+            function onEvent1(data) {
+                expect(data).equal(44);
+                times++;
+            }
+
+            function onEvent2(data) {
+                expect(data).equal(44);
+                if (++times === 2) {
+                    vfs.off("myevent", onEvent1, function(err) {
+                        if (err) throw err;
+                        vfs.off("myevent", onEvent2, done);
+                    });
+                }
+            }
+        });
+        it("should stop listening after a handler is removed", function(done) {
+            vfs.on("myevent", onEvent, function(err) {
+                if (err) throw err;
+                vfs.emit("myevent", 45, function(err) {
+                    if (err) throw err;
+                    vfs.off("myevent", onEvent, function(err) {
+                        if (err) throw err;
+                        vfs.emit("myevent", 46, done);
+                    });
+                });
+            });
+
+            function onEvent(data) {
+                expect(data).equal(45);
+            }
+        });
+    });
+
     describe("notsupported", function() {
         it("should not support watch()", function(next) {
             vfs.watch("test", {}, function(err, meta) {
-                assert(err.code, "ENOTSUPPORTED");
+                assert.equal(err.code, "ENOTSUPPORTED");
                 next();
             });
         });
 
         it("should not support spawn()", function(next) {
-            vfs.watch("test", {}, function(err, meta) {
-                assert(err.code, "ENOTSUPPORTED");
+            vfs.spawn("test", {}, function(err, meta) {
+                assert.equal(err.code, "ENOTSUPPORTED");
                 next();
             });
         });
 
         it("should not support symlink()", function(next) {
-            vfs.watch("test", {}, function(err, meta) {
-                assert(err.code, "ENOTSUPPORTED");
+            vfs.symlink("test", {}, function(err, meta) {
+                assert.equal(err.code, "ENOTSUPPORTED");
                 next();
             });
         });
 
         it("should not support connect()", function(next) {
-            vfs.watch("test", {}, function(err, meta) {
-                assert(err.code, "ENOTSUPPORTED");
+            vfs.connect(10, {}, function(err, meta) {
+                assert.equal(err.code, "ENOTSUPPORTED");
                 next();
             });
         });
 
         it("should not support execFile()", function(next) {
-            vfs.watch("test", {}, function(err, meta) {
-                assert(err.code, "ENOTSUPPORTED");
+            vfs.execFile("test", {}, function(err, meta) {
+                assert.equal(err.code, "ENOTSUPPORTED");
                 next();
             });
         });
