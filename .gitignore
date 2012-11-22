@@ -1,2 +1,6 @@
+*.swp
+*.c9save
+coverage.html
+lib-cov
 node_modules
 *.un~
