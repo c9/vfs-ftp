@@ -7,9 +7,9 @@
         "type": "git",
         "url": "git://github.com/c9/vfs-ftp.git"
     },
-    "main": "ftp.js",
+    "main": "lib/ftp.js",
     "dependencies": {
-        "jsftp": "0.5.0",
+        "jsftp": "~0.5.1",
         "simple-mime": "0.0.5"
     },
     "devDependencies": {

@@ -25,9 +25,7 @@ describe("jsftp test suite", function() {
         }
 
         setTimeout(function() {
-            vfs = require('vfs-lint')(require(libpath + '/ftp')({
-                credentials: FTPCredentials
-            }));
+            vfs = require('vfs-lint')(require(libpath + '/ftp')(FTPCredentials));
             next();
         }, 200);
     });
