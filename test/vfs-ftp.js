@@ -25,9 +25,7 @@ describe("jsftp test suite", function() {
         }
 
         setTimeout(function() {
-            vfs = require('vfs-lint')(require(libpath + '/ftp')({
-                credentials: FTPCredentials
-            }));
+            vfs = require('vfs-lint')(require(libpath + '/ftp')(FTPCredentials));
             next();
         }, 200);
     });
@@ -43,7 +41,7 @@ describe("jsftp test suite", function() {
 
     describe("readFile()", function() {
         it("should return a valid 'stat' object with streaming file contents", function(next) {
-            vfs.readfile("package.json", {}, function(err, meta) {
+            vfs.readfile("/package.json", {}, function(err, meta) {
                 assert(!err, err);
                 Ftp._concatStream(null, meta.stream, function(err, data) {
                     assert(!err);
@@ -65,15 +63,23 @@ describe("jsftp test suite", function() {
                 next();
             });
         });
+        
+        it("should return an error for directories", function(next) {
+            vfs.readfile("/test", {}, function(err, meta) {
+                assert(err);
+                assert.equal(err.code, "EISDIR");
+                next();
+            });
+        });
 
         it("should properly handle etags", function(next) {
-            vfs.readfile("package.json", {}, function(err, meta) {
+            vfs.readfile("/package.json", {}, function(err, meta) {
                 assert(!err);
                 assert(meta.etag);
-                vfs.readfile("package.json", {
+                vfs.readfile("/package.json", {
                     etag: meta.etag
                 }, function(err, meta2) {
-                    assert(!err);
+                    assert(!err, err);
                     assert.equal(meta2.notModified, true);
                     next();
                 });
@@ -151,7 +157,7 @@ describe("jsftp test suite", function() {
             var realContents = fs.readFileSync("package.json", "utf8");
             var target = "package.json.bak";
             vfs.copy(target, {
-                from: "package.json"
+                from: "/package.json"
             }, function(err, meta) {
                 assert.ok(!err, err);
                 assert.ok(fs.existsSync(target));
@@ -165,7 +171,7 @@ describe("jsftp test suite", function() {
             var realContents = fs.readFileSync("package.json", "utf8");
             var target = "package.json.bak";
 
-            vfs.copy("package.json", {
+            vfs.copy("/package.json", {
                 to: target
             }, function(err, meta) {
                 assert.ok(!err, err);
@@ -201,10 +207,21 @@ describe("jsftp test suite", function() {
         var realStat = fs.statSync("package.json");
         it('should return stat info for the text file', function(next) {
             vfs.stat("/package.json", {}, function(err, stat) {
-                assert(!err);
+                assert(!err, err);
                 assert.equal(stat.name, "package.json");
                 assert.equal(stat.size, realStat.size);
                 assert.equal(stat.mime, "application/json");
+                next();
+            });
+        });
+        
+        it('should return stat info for a folder', function(next) {
+            var dirStat = fs.statSync("./test");
+            vfs.stat("/test/", {}, function(err, stat) {
+                assert(!err, err);
+                assert.equal(stat.name, "test");
+                assert.equal(stat.mime, "inode/directory");
+                assert.equal(stat.size, dirStat.size);
                 next();
             });
         });
@@ -217,12 +234,12 @@ describe("jsftp test suite", function() {
         });
 
         it("vfs.stat should return a valid 'stat' object", function(next) {
-            vfs.stat("package.json", {}, function(err, meta) {
+            vfs.stat("/package.json", {}, function(err, meta) {
                 assert.ok(!err, err);
                 assert.equal(meta.mime, "application/json");
                 assert.equal(meta.size, fs.statSync("package.json").size);
                 assert.equal(meta.name, "package.json");
-                assert.equal(meta.path, "package.json");
+                assert.equal(meta.path, "/package.json");
                 next();
             });
         });
