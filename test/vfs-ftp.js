@@ -3,8 +3,11 @@ var libpath = process.env['VFS_FTP_COV'] ? '../lib-cov' : '../lib';
 var exec = require("child_process").spawn;
 var assert = require("assert");
 var fs = require('fs');
+var path = require("path");
 var Ftp = require("jsftp");
 var expect = require('chai').expect;
+
+var existsSync = fs.existsSync || path.existsSync;
 
 var FTPCredentials = {
     host: "localhost",
@@ -63,7 +66,7 @@ describe("jsftp test suite", function() {
                 next();
             });
         });
-        
+
         it("should return an error for directories", function(next) {
             vfs.readfile("/test", {}, function(err, meta) {
                 assert(err);
@@ -160,7 +163,7 @@ describe("jsftp test suite", function() {
                 from: "/package.json"
             }, function(err, meta) {
                 assert.ok(!err, err);
-                assert.ok(fs.existsSync(target));
+                assert.ok(existsSync(target));
                 assert.equal(fs.readFileSync(target, "utf8"), realContents);
                 fs.unlinkSync(target);
                 next();
@@ -175,7 +178,7 @@ describe("jsftp test suite", function() {
                 to: target
             }, function(err, meta) {
                 assert.ok(!err, err);
-                assert.ok(fs.existsSync(target));
+                assert.ok(existsSync(target));
                 assert.equal(fs.readFileSync(target, "utf8"), realContents);
                 fs.unlinkSync(target);
                 next();
@@ -214,7 +217,7 @@ describe("jsftp test suite", function() {
                 next();
             });
         });
-        
+
         it('should return stat info for a folder', function(next) {
             var dirStat = fs.statSync("./test");
             vfs.stat("/test/", {}, function(err, stat) {
@@ -249,13 +252,13 @@ describe("jsftp test suite", function() {
         it("should create a directory", function(next) {
             var vpath = "newdir";
             // Make sure it doesn't exist yet
-            assert.ok(!fs.existsSync(vpath));
+            assert.ok(!existsSync(vpath));
             vfs.mkdir(vpath, {}, function(err, meta) {
                 if (err) {
-                    if (fs.existsSync(vpath)) fs.rmdirSync(vpath);
+                    if (existsSync(vpath)) fs.rmdirSync(vpath);
                     return next(err);
                 }
-                assert.ok(fs.existsSync(vpath));
+                assert.ok(existsSync(vpath));
                 fs.rmdirSync(vpath);
                 next();
             });
@@ -281,15 +284,15 @@ describe("jsftp test suite", function() {
             var text = "Move me please\n";
 
             fs.writeFileSync(before, text);
-            expect(fs.existsSync(before)).ok;
-            expect(fs.existsSync(after)).not.ok;
+            expect(existsSync(before)).ok;
+            expect(existsSync(after)).not.ok;
 
             vfs.rename(before, {
                 to: after
             }, function(err, meta) {
                 if (err) throw err;
-                expect(fs.existsSync(before)).not.ok;
-                expect(fs.existsSync(after)).ok;
+                expect(existsSync(before)).not.ok;
+                expect(existsSync(after)).ok;
                 expect(fs.readFileSync(after, "utf8")).equal(text);
                 fs.unlinkSync(after);
                 done();
@@ -302,15 +305,15 @@ describe("jsftp test suite", function() {
             var text = "Move me please\n";
 
             fs.writeFileSync(before, text);
-            expect(fs.existsSync(before)).ok;
-            expect(fs.existsSync(after)).not.ok;
+            expect(existsSync(before)).ok;
+            expect(existsSync(after)).not.ok;
 
             vfs.rename(after, {
                 from: before
             }, function(err, meta) {
                 if (err) throw err;
-                expect(fs.existsSync(before)).not.ok;
-                expect(fs.existsSync(after)).ok;
+                expect(existsSync(before)).not.ok;
+                expect(existsSync(after)).ok;
                 expect(fs.readFileSync(after, "utf8")).equal(text);
                 fs.unlinkSync(after);
                 done();
@@ -331,17 +334,17 @@ describe("jsftp test suite", function() {
         it("should delete a file", function(next) {
             var vpath = "deleteme.txt";
             fs.writeFileSync(vpath, "DELETE ME!\n");
-            assert.ok(fs.existsSync(vpath));
+            assert.ok(existsSync(vpath));
             vfs.rmfile(vpath, {}, function(err, meta) {
                 if (err) throw err;
-                assert(!fs.existsSync(vpath));
+                assert(!existsSync(vpath));
                 next();
             });
         });
 
         it("should error with ENOENT if the file doesn't exist", function(next) {
             var vpath = "/badname.txt";
-            assert.ok(!fs.existsSync(vpath));
+            assert.ok(!existsSync(vpath));
             vfs.rmfile(vpath, {}, function(err, meta) {
                 assert.equal(err.code, "ENOENT");
                 next();
@@ -351,7 +354,7 @@ describe("jsftp test suite", function() {
         /*
         it("should error with EISDIR if the path is a directory", function(next) {
             var vpath = "/dir";
-            assert.ok(fs.existsSync(vpath));
+            assert.ok(existsSync(vpath));
             vfs.rmfile(vpath, {}, function(err, meta) {
                 assert.equal(err.code, "EISDIR");
                 next();
@@ -364,17 +367,17 @@ describe("jsftp test suite", function() {
         it("should delete a directory", function(next) {
             var vpath = "newdir";
             fs.mkdirSync(vpath);
-            assert(fs.existsSync(vpath));
+            assert(existsSync(vpath));
             vfs.rmdir(vpath, {}, function(err, meta) {
                 assert(!err);
-                assert(!fs.existsSync(vpath));
+                assert(!existsSync(vpath));
                 next();
             });
         });
 
         it("should error with ENOENT if the directory doesn't exist", function(next) {
             var vpath = "/baddir";
-            assert(!fs.existsSync(vpath));
+            assert(!existsSync(vpath));
             vfs.rmdir(vpath, {}, function(err, meta) {
                 assert.equal(err.code, "ENOENT");
                 next();
@@ -384,7 +387,7 @@ describe("jsftp test suite", function() {
         /*
         it("should error with ENOTDIR if the path is a file", function(next) {
             var vpath = "package.json";
-            assert(fs.existsSync(vpath));
+            assert(existsSync(vpath));
             vfs.rmdir(vpath, {}, function(err, meta) {
                 assert.equal(err.code, "ENOTDIR");
                 next();
@@ -394,14 +397,14 @@ describe("jsftp test suite", function() {
         it("should do recursive deletes if options.recursive is set", function(next) {
             fs.mkdirSync(base + "/foo");
             fs.writeFileSync(base + "/foo/bar.txt", "Hello");
-            expect(fs.existsSync(base + "/foo")).ok;
-            expect(fs.existsSync(base + "/foo/bar.txt")).ok;
+            expect(existsSync(base + "/foo")).ok;
+            expect(existsSync(base + "/foo/bar.txt")).ok;
             vfs.rmdir("/foo", {
                 recursive: true
             }, function(err, meta) {
                 if (err) throw err;
-                expect(fs.existsSync(base + "/foo/bar.txt")).not.ok;
-                expect(fs.existsSync(base + "/foo")).not.ok;
+                expect(existsSync(base + "/foo/bar.txt")).not.ok;
+                expect(existsSync(base + "/foo")).not.ok;
                 next();
             });
         });
