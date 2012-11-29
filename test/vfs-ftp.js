@@ -277,6 +277,23 @@ describe("jsftp test suite", function() {
         });
     });
 
+    describe('mkfile()', function() {
+        it("should create a file", function(next) {
+            var vpath = "vfs-ftp-test.txt";
+            // Make sure it doesn't exist yet
+            assert.ok(!existsSync(vpath));
+            vfs.mkfile(vpath, {}, function(err, meta) {
+                if (err) {
+                    if (existsSync(vpath)) fs.unlinkSync(vpath);
+                    return next(err);
+                }
+                assert.ok(existsSync(vpath));
+                fs.unlinkSync(vpath);
+                next();
+            });
+        });
+    });
+
     describe('vfs.rename()', function() {
         it("should rename a file using options.to", function(done) {
             var before = "start.txt";
