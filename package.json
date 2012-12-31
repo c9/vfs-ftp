@@ -9,7 +9,7 @@
     },
     "main": "lib/ftp.js",
     "dependencies": {
-        "jsftp": "~0.5.4",
+        "jsftp": "~0.5.7",
         "simple-mime": "0.0.5"
     },
     "devDependencies": {
