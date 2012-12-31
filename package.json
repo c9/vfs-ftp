@@ -2,7 +2,7 @@
     "author": "Sergi Mansilla <sergi@c9.io>",
     "name": "vfs-ftp",
     "description": "FTP adapter for Virtual File System (VFS)",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "repository": {
         "type": "git",
         "url": "git://github.com/c9/vfs-ftp.git"
