@@ -21,7 +21,9 @@ describe("jsftp test suite", function() {
 
     beforeEach(function(next) {
         try {
-            daemon = exec('python', ['node_modules/jsftp/test/basic_ftpd.py']);
+            daemon = exec("python",  ["node_modules/jsftp/test/basic_ftpd.py"], {
+                         cwd: path.resolve(path.join(__dirname, ".."))
+            });
         }
         catch (e) {
             console.log("There was a problem trying to start the FTP service. " + "This could be because you don't have enough permissions " + "to run the FTP service on the given port. Please make sure that " + "you have python installed as well.\n\n" + e);
@@ -30,7 +32,7 @@ describe("jsftp test suite", function() {
         setTimeout(function() {
             vfs = require('vfs-lint')(require(libpath + '/ftp')(FTPCredentials));
             next();
-        }, 200);
+        }, 300);
     });
 
     afterEach(function(next) {
@@ -48,14 +50,14 @@ describe("jsftp test suite", function() {
                 assert(!err, err);
                 Ftp._concatStream(null, meta.stream, function(err, data) {
                     assert(!err);
-                    var realContents = fs.readFileSync("package.json");
+                    var realContents = fs.readFileSync("./package.json");
                     assert.equal(realContents, data.toString());
                     next();
                 });
 
                 assert.ok(!err);
                 assert.equal(meta.mime, "application/json");
-                assert.equal(meta.size, fs.statSync("package.json").size);
+                assert.equal(meta.size, fs.statSync("./package.json").size);
             });
         });
 
